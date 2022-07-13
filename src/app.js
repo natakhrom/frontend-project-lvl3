@@ -77,6 +77,15 @@ export default () => {
         axios.get(buildPath(watchedState.field))
           .then((res) => {
             const doc = markup(res.data.contents);
+            const errorNode = doc.querySelector('parsererror');
+            if (errorNode) {
+              watchedState.processState = 'failed';
+              i18.then(() => {
+                elements.message.textContent = i18next.t('notValidRSS');
+              });
+              return;
+            }
+
             watchedState.processState = 'processed';
             const validRss = watchedState.field;
             i18.then(() => {
@@ -92,7 +101,6 @@ export default () => {
             watchedState.feeds.push(feed);
 
             const posts = doc.querySelectorAll('item');
-            const feedPosts = [];
             posts.forEach((item) => {
               const post = {
                 id: uniqueId(),
@@ -102,17 +110,16 @@ export default () => {
                 feedId: watchedState.feeds[watchedState.feeds.length - 1].id,
                 isVisited: false,
               };
-              feedPosts.push(post);
+              watchedState.posts.unshift(post);
             });
-            watchedState.posts.push(feedPosts);
 
             watchedState.listUrl.push(validRss);
             form.reset();
           })
           .catch(() => {
-            watchedState.processState = 'failed';
             i18.then(() => {
-              elements.message.textContent = i18next.t('notValidRSS');
+              watchedState.processState = 'failed';
+              elements.message.textContent = i18next.t('networkError');
             });
           });
       })
@@ -127,15 +134,15 @@ export default () => {
       axios.get(buildPath(url))
         .then((response) => {
           const filteredPostsFeed = watchedState.posts
-            .find((post) => post[0].feedId === id);
-          const titles = filteredPostsFeed.map((i) => i.title);
+            .filter((post) => post.feedId === id);
+          const links = filteredPostsFeed.map((i) => i.link);
 
           const newDoc = markup(response.data.contents);
           const newPosts = newDoc.querySelectorAll('item');
           newPosts.forEach((item) => {
-            const titleNewPost = unifyText(item.querySelector('title').textContent);
-            const existTitle = titles.find((title) => title === titleNewPost);
-            if (existTitle === undefined) {
+            const linkNewPost = unifyText(item.querySelector('link').nextSibling.textContent);
+            const existLink = links.find((link) => link === linkNewPost);
+            if (existLink === undefined) {
               const post = {
                 id: uniqueId(),
                 title: unifyText(item.querySelector('title').textContent),
@@ -144,11 +151,12 @@ export default () => {
                 feedId: id,
                 isVisited: false,
               };
-              filteredPostsFeed.unshift(post);
+              watchedState.posts.push(post);
             }
           });
         })
         .catch(() => i18.then(() => {
+          watchedState.processState = 'failed';
           elements.message.textContent = i18next.t('networkError');
         }));
     });

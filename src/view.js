@@ -101,57 +101,55 @@ const renderPosts = (state, elements) => {
     elements.postsCard.innerHTML = '';
     const ul = createUlContainer();
 
-    state.posts.slice().reverse().forEach((feedPost) => {
-      feedPost.forEach((post) => {
-        const li = document.createElement('li');
-        li.classList.add(
-          'list-group-item',
-          'd-flex',
-          'justify-content-between',
-          'align-items-start',
-          'border-0',
-          'border-end-0',
-        );
+    state.posts.forEach((post) => {
+      const li = document.createElement('li');
+      li.classList.add(
+        'list-group-item',
+        'd-flex',
+        'justify-content-between',
+        'align-items-start',
+        'border-0',
+        'border-end-0',
+      );
 
-        const a = document.createElement('a');
-        a.setAttribute('href', post.link);
-        a.setAttribute('data-id', post.id);
-        a.setAttribute('target', '_blank');
-        a.setAttribute('rel', 'noopener', 'noreferrer');
-        a.textContent = post.title;
+      const a = document.createElement('a');
+      a.setAttribute('href', post.link);
+      a.setAttribute('data-id', post.id);
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener', 'noreferrer');
+      a.textContent = post.title;
 
-        if (state.visitedLinks.includes(post.id)) {
-          a.classList.add('fw-normal', 'link-secondary');
-        } else {
-          a.classList.add('fw-bold');
-        }
+      if (state.visitedLinks.includes(post.id)) {
+        a.classList.add('fw-normal', 'link-secondary');
+      } else {
+        a.classList.add('fw-bold');
+      }
 
-        a.addEventListener('click', () => {
-          post.isVisited = true;
-          state.visitedLinks.push(post.id);
-          renderPosts(state, elements);
-        });
-
-        const button = document.createElement('button');
-        button.setAttribute('type', 'button');
-        button.setAttribute('data-bs-toggle', 'modal');
-        button.setAttribute('data-bs-target', '#modal');
-        button.setAttribute('data-id', post.id);
-        button.classList.add('btn', 'btn-outline-primary', 'btn-sm');
-        button.textContent = 'Просмотр';
-
-        button.addEventListener('click', () => {
-          post.isVisited = true;
-          state.visitedLinks.push(post.id);
-          renderPosts(state, elements);
-
-          createBackgroundShadow(elements);
-          showModal(elements, post.title, post.description, post.link);
-        });
-
-        li.append(a, button);
-        ul.append(li);
+      a.addEventListener('click', () => {
+        post.isVisited = true;
+        state.visitedLinks.push(post.id);
+        renderPosts(state, elements);
       });
+
+      const button = document.createElement('button');
+      button.setAttribute('type', 'button');
+      button.setAttribute('data-bs-toggle', 'modal');
+      button.setAttribute('data-bs-target', '#modal');
+      button.setAttribute('data-id', post.id);
+      button.classList.add('btn', 'btn-outline-primary', 'btn-sm');
+      button.textContent = 'Просмотр';
+
+      button.addEventListener('click', () => {
+        post.isVisited = true;
+        state.visitedLinks.push(post.id);
+        renderPosts(state, elements);
+
+        createBackgroundShadow(elements);
+        showModal(elements, post.title, post.description, post.link);
+      });
+
+      li.append(a, button);
+      ul.prepend(li);
     });
 
     elements.postsCard.append(createTitle('Посты'), ul);
@@ -176,7 +174,7 @@ const renderFeeds = (state, elements) => {
       p.textContent = description;
 
       li.append(heading, p);
-      ul.prepend(li);
+      ul.append(li);
     });
 
     elements.feedsCard.append(createTitle('Фиды'), ul);

@@ -1,9 +1,9 @@
 const markup = (string) => {
   // eslint-disable-next-line no-undef
   const parser = new DOMParser();
-  const doc = parser.parseFromString(string, 'text/html');
+  const dom = parser.parseFromString(string, 'application/xml');
 
-  return doc;
+  return dom;
 };
 
 const buildPath = (url) => {
