@@ -16,16 +16,26 @@ const renderInput = (state, elements) => {
     elements.input.classList.add('is-invalid');
     elements.input.removeAttribute('readonly');
   }
+  if (state.processState === 'filling') {
+    elements.input.classList.remove('is-invalid');
+  }
 };
 
 const renderMessageFeedback = (state, elements) => {
   elements.message.innerHTML = '';
+  if (state.processState === 'processing') {
+    elements.message.classList.remove('text-danger', 'text-success');
+    elements.message.classList.add('text-info');
+  }
   if (state.processState === 'processed') {
-    elements.message.classList.remove('text-danger');
+    elements.message.classList.remove('text-danger', 'text-info');
     elements.message.classList.add('text-success');
   }
   if (state.processState === 'failed') {
-    elements.message.classList.remove('text-success');
+    elements.message.classList.remove('text-success', 'text-info');
+    elements.message.classList.add('text-danger');
+  }
+  if (state.processState === 'offline') {
     elements.message.classList.add('text-danger');
   }
 };

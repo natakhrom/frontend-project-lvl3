@@ -29,6 +29,30 @@ setLocale({
   },
 });
 
+const createFeed = (dom, rss) => {
+  const feed = {
+    id: uniqueId(),
+    title: unifyText(dom.querySelector('channel').querySelector('title').textContent),
+    description: unifyText(dom.querySelector('channel').querySelector('description').innerHTML),
+    url: rss,
+  };
+
+  return feed;
+};
+
+const createPost = (item, id) => {
+  const post = {
+    id: uniqueId(),
+    title: unifyText(item.querySelector('title').textContent),
+    description: unifyText(item.querySelector('description').innerHTML),
+    link: unifyText(item.querySelector('link').nextSibling.textContent),
+    feedId: id,
+    isVisited: false,
+  };
+
+  return post;
+};
+
 export default () => {
   const form = document.querySelector('form');
   const elements = {
@@ -62,13 +86,19 @@ export default () => {
     renderPosts(watchedState, elements);
   });
 
-  elements.input.addEventListener('change', (e) => {
+  elements.input.addEventListener('input', (e) => {
     watchedState.field = e.target.value;
+    if (watchedState.field === '') {
+      watchedState.processState = 'filling';
+    }
   });
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     watchedState.processState = 'processing';
+    i18.then(() => {
+      elements.message.textContent = i18next.t('isLoading');
+    });
 
     const schema = yup.string().url().required().notOneOf(watchedState.listUrl);
     schema
@@ -85,32 +115,18 @@ export default () => {
               });
               return;
             }
-
             watchedState.processState = 'processed';
             const validRss = watchedState.field;
             i18.then(() => {
               elements.message.textContent = i18next.t('success');
             });
 
-            const feed = {
-              id: uniqueId(),
-              title: unifyText(doc.querySelector('channel').querySelector('title').textContent),
-              description: unifyText(doc.querySelector('channel').querySelector('description').innerHTML),
-              url: validRss,
-            };
-            watchedState.feeds.push(feed);
+            watchedState.feeds.push(createFeed(doc, validRss));
 
             const posts = doc.querySelectorAll('item');
             posts.forEach((item) => {
-              const post = {
-                id: uniqueId(),
-                title: unifyText(item.querySelector('title').textContent),
-                description: unifyText(item.querySelector('description').innerHTML),
-                link: unifyText(item.querySelector('link').nextSibling.textContent),
-                feedId: watchedState.feeds[watchedState.feeds.length - 1].id,
-                isVisited: false,
-              };
-              watchedState.posts.unshift(post);
+              const feedId = watchedState.feeds[watchedState.feeds.length - 1].id;
+              watchedState.posts.unshift(createPost(item, feedId));
             });
 
             watchedState.listUrl.push(validRss);
@@ -118,7 +134,7 @@ export default () => {
           })
           .catch(() => {
             i18.then(() => {
-              watchedState.processState = 'failed';
+              watchedState.processState = 'offline';
               elements.message.textContent = i18next.t('networkError');
             });
           });
@@ -130,37 +146,38 @@ export default () => {
   });
 
   function updatePosts() {
-    watchedState.feeds.forEach(({ url, id }) => {
-      axios.get(buildPath(url))
-        .then((response) => {
-          const filteredPostsFeed = watchedState.posts
-            .filter((post) => post.feedId === id);
-          const links = filteredPostsFeed.map((i) => i.link);
+    const feedPromises = watchedState.feeds.map(({ url, id }) => axios.get(buildPath(url))
+      .then((v) => ({ result: 'success', value: v, id }))
+      .catch((e) => ({ result: 'error', value: e })));
 
-          const newDoc = markup(response.data.contents);
-          const newPosts = newDoc.querySelectorAll('item');
-          newPosts.forEach((item) => {
-            const linkNewPost = unifyText(item.querySelector('link').nextSibling.textContent);
-            const existLink = links.find((link) => link === linkNewPost);
-            if (existLink === undefined) {
-              const post = {
-                id: uniqueId(),
-                title: unifyText(item.querySelector('title').textContent),
-                description: unifyText(item.querySelector('description').innerHTML),
-                link: unifyText(item.querySelector('link').nextSibling.textContent),
-                feedId: id,
-                isVisited: false,
-              };
-              watchedState.posts.push(post);
-            }
-          });
-        })
-        .catch(() => i18.then(() => {
-          watchedState.processState = 'failed';
-          elements.message.textContent = i18next.t('networkError');
-        }));
-    });
-    setTimeout(updatePosts, delay);
+    Promise.all(feedPromises)
+      .then((responses) => {
+        responses.forEach(({ result, value, id }) => {
+          if (result === 'success') {
+            watchedState.processState = 'filling';
+            const filteredPostsFeed = watchedState.posts.filter((post) => post.feedId === id);
+            const links = filteredPostsFeed.map((i) => i.link);
+
+            const newDoc = markup(value.data.contents);
+            const newPosts = newDoc.querySelectorAll('item');
+            Array.from(newPosts)
+              .reverse()
+              .forEach((item) => {
+                const linkNewPost = unifyText(item.querySelector('link').nextSibling.textContent);
+                console.log(linkNewPost);
+                if (!links.includes(linkNewPost)) {
+                  watchedState.posts.push(createPost(item, id));
+                }
+              });
+          } else {
+            i18.then(() => {
+              watchedState.processState = 'offline';
+              elements.message.textContent = i18next.t('networkError');
+            });
+          }
+        });
+        setTimeout(updatePosts, delay);
+      });
   }
 
   renderInput(watchedState, elements);

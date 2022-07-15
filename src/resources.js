@@ -6,6 +6,7 @@ export default i18next.init({
   resources: {
     ru: {
       translation: {
+        isLoading: 'Идёт загрузка...',
         success: 'RSS успешно загружен',
         notUrl: 'Ссылка должна быть валидным URL',
         notValidRSS: 'Ресурс не содержит валидный RSS',
