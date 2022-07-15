@@ -45,7 +45,7 @@ const createPost = (item, id) => {
     id: uniqueId(),
     title: unifyText(item.querySelector('title').textContent),
     description: unifyText(item.querySelector('description').innerHTML),
-    link: unifyText(item.querySelector('link').nextSibling.textContent),
+    link: unifyText(item.querySelector('link').textContent),
     feedId: id,
     isVisited: false,
   };
@@ -163,8 +163,7 @@ export default () => {
             Array.from(newPosts)
               .reverse()
               .forEach((item) => {
-                const linkNewPost = unifyText(item.querySelector('link').nextSibling.textContent);
-                console.log(linkNewPost);
+                const linkNewPost = unifyText(item.querySelector('link').textContent);
                 if (!links.includes(linkNewPost)) {
                   watchedState.posts.push(createPost(item, id));
                 }
