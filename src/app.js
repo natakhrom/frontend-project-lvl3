@@ -148,7 +148,6 @@ export default () => {
       .then((responses) => {
         responses.forEach(({ result, value, id }) => {
           if (result === 'success') {
-            watchedState.processState = 'processed';
             const filteredPostsFeed = watchedState.posts.filter((post) => post.feedId === id);
             const links = filteredPostsFeed.map((i) => i.link);
 
