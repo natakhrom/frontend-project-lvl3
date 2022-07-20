@@ -1,44 +1,5 @@
 /* eslint-disable no-undef */
 /* eslint-disable no-param-reassign */
-const renderInput = (state, elements) => {
-  if (state.processState === 'processing') {
-    elements.button.setAttribute('disabled', '');
-    elements.input.setAttribute('readonly', 'true');
-  }
-  if (state.processState === 'processed') {
-    elements.button.removeAttribute('disabled');
-    elements.input.removeAttribute('readonly');
-    elements.input.classList.remove('is-invalid');
-    elements.input.focus();
-  }
-  if (state.processState === 'failed') {
-    elements.button.removeAttribute('disabled');
-    elements.input.classList.add('is-invalid');
-    elements.input.removeAttribute('readonly');
-  }
-  if (state.processState === 'filling') {
-    elements.input.classList.remove('is-invalid');
-  }
-};
-
-const renderMessageFeedback = (state, elements) => {
-  elements.message.innerHTML = '';
-  if (state.processState === 'processing') {
-    elements.message.classList.remove('text-danger', 'text-success');
-    elements.message.classList.add('text-info');
-  }
-  if (state.processState === 'processed') {
-    elements.message.classList.remove('text-danger', 'text-info');
-    elements.message.classList.add('text-success');
-  }
-  if (state.processState === 'failed') {
-    elements.message.classList.remove('text-success', 'text-info');
-    elements.message.classList.add('text-danger');
-  }
-  if (state.processState === 'offline') {
-    elements.message.classList.add('text-danger');
-  }
-};
 
 const createTitle = (title) => {
   const div = document.createElement('div');
@@ -65,47 +26,6 @@ const createUlContainer = () => {
   return ul;
 };
 
-const createBackgroundShadow = (elements) => {
-  const div = document.createElement('div');
-  div.classList.add('modal-backdrop', 'fade', 'show');
-
-  elements.body.append(div);
-};
-
-const removeBackgroundShadow = (elements) => {
-  const div = elements.body.querySelector('.modal-backdrop');
-
-  if (div === null) {
-    return;
-  }
-
-  div.remove();
-};
-
-const closeModal = (elements) => {
-  elements.modal.classList.remove('show');
-  elements.modal.setAttribute('style', 'display: none');
-  elements.modal.removeAttribute('aria-modal');
-  elements.modal.setAttribute('aria-hidden', true);
-
-  removeBackgroundShadow(elements);
-};
-
-const showModal = (elements, title, description, link) => {
-  elements.modal.classList.add('show');
-  elements.modal.removeAttribute('aria-hidden');
-  elements.modal.setAttribute('style', 'display: block');
-  elements.modal.setAttribute('aria-modal', true);
-  elements.modalTitle.textContent = title;
-  elements.modalText.textContent = description;
-
-  elements.buttonCross.addEventListener('click', () => closeModal(elements));
-  elements.buttonClose.addEventListener('click', () => closeModal(elements));
-  elements.buttonLink.addEventListener('click', () => {
-    elements.buttonLink.setAttribute('href', link);
-  });
-};
-
 const renderPosts = (state, elements) => {
   if (state.posts.length !== 0) {
     elements.postsCard.innerHTML = '';
@@ -129,7 +49,7 @@ const renderPosts = (state, elements) => {
       a.setAttribute('rel', 'noopener', 'noreferrer');
       a.textContent = post.title;
 
-      if (state.visitedLinks.includes(post.id)) {
+      if (state.visitedLinks.has(post.id)) {
         a.classList.add('fw-normal', 'link-secondary');
       } else {
         a.classList.add('fw-bold');
@@ -137,7 +57,7 @@ const renderPosts = (state, elements) => {
 
       a.addEventListener('click', () => {
         post.isVisited = true;
-        state.visitedLinks.push(post.id);
+        state.visitedLinks.add(post.id);
         renderPosts(state, elements);
       });
 
@@ -151,11 +71,15 @@ const renderPosts = (state, elements) => {
 
       button.addEventListener('click', () => {
         post.isVisited = true;
-        state.visitedLinks.push(post.id);
+        state.visitedLinks.add(post.id);
         renderPosts(state, elements);
 
-        createBackgroundShadow(elements);
-        showModal(elements, post.title, post.description, post.link);
+        elements.modal.toggle();
+        elements.modalTitle.textContent = post.title;
+        elements.modalText.textContent = post.description;
+        elements.buttonLink.addEventListener('click', () => {
+          elements.buttonLink.setAttribute('href', post.link);
+        });
       });
 
       li.append(a, button);
@@ -191,9 +115,52 @@ const renderFeeds = (state, elements) => {
   }
 };
 
-export {
-  renderInput,
-  renderMessageFeedback,
-  renderPosts,
-  renderFeeds,
+const render = (state, elements, i18next) => {
+  switch (state.processState) {
+    case 'filling':
+      elements.input.classList.remove('is-invalid');
+      elements.message.classList.remove('text-danger', 'text-info');
+      elements.message.textContent = '';
+      break;
+
+    case 'processing':
+      elements.button.setAttribute('disabled', '');
+      elements.input.setAttribute('readonly', 'true');
+      elements.input.classList.remove('is-invalid');
+      elements.message.classList.remove('text-danger', 'text-success');
+      elements.message.classList.add('text-info');
+      elements.message.textContent = i18next.t('isLoading');
+      break;
+
+    case 'processed':
+      elements.button.removeAttribute('disabled');
+      elements.input.removeAttribute('readonly');
+      elements.input.classList.remove('is-invalid');
+      elements.input.focus();
+      elements.message.classList.remove('text-danger', 'text-info');
+      elements.message.classList.add('text-success');
+      elements.message.textContent = i18next.t('success');
+      renderFeeds(state, elements);
+      renderPosts(state, elements);
+      break;
+
+    case 'offline':
+      elements.message.classList.add('text-danger');
+      elements.message.textContent = i18next.t('networkError');
+      break;
+
+    case 'failed':
+      elements.button.removeAttribute('disabled');
+      elements.input.classList.add('is-invalid');
+      elements.input.removeAttribute('readonly');
+      elements.message.classList.remove('text-success', 'text-info');
+      elements.message.classList.add('text-danger');
+      elements.message.textContent = i18next.t('notValidRSS');
+      break;
+
+    default:
+      throw new Error(`Unknown process state: ${state.processState}`);
+  }
 };
+
+export default render;

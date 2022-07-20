@@ -1,40 +1,28 @@
 /* eslint-disable no-undef */
 import * as yup from 'yup';
-import { setLocale } from 'yup';
+import { Modal } from 'bootstrap';
 import onChange from 'on-change';
 import i18next from 'i18next';
 import uniqueId from 'lodash/uniqueId';
-import {
-  renderInput,
-  renderMessageFeedback,
-  renderPosts,
-  renderFeeds,
-} from './view.js';
-import i18 from './resources.js';
-import {
-  markup,
-  buildPath,
-  unifyText,
-} from './utils.js';
+import axios from 'axios';
+import render from './view.js';
+import parse from './parse.js';
+import ru from './locales/ru.js';
 
-const axios = require('axios').default;
+const buildPath = (url) => {
+  const parsedUrl = new URL('/get', 'https://allorigins.hexlet.app');
+  parsedUrl.searchParams.append('disableCache', 'true');
+  parsedUrl.searchParams.append('url', url);
 
-setLocale({
-  mixed: {
-    notOneOf: () => ({ key: 'exist' }),
-  },
-  string: {
-    url: () => ({ key: 'notUrl' }),
-    required: () => ({ key: 'notEmpty' }),
-  },
-});
+  return parsedUrl.toString();
+};
 
-const createFeed = (dom, rss) => {
+const createFeed = (dom, urlRss) => {
   const feed = {
     id: uniqueId(),
-    title: unifyText(dom.querySelector('channel').querySelector('title').textContent),
-    description: unifyText(dom.querySelector('channel').querySelector('description').innerHTML),
-    url: rss,
+    title: dom.querySelector('channel').querySelector('title').textContent,
+    description: dom.querySelector('description').textContent,
+    url: urlRss,
   };
 
   return feed;
@@ -43,9 +31,9 @@ const createFeed = (dom, rss) => {
 const createPost = (item, id) => {
   const post = {
     id: uniqueId(),
-    title: unifyText(item.querySelector('title').textContent),
-    description: unifyText(item.querySelector('description').innerHTML),
-    link: unifyText(item.querySelector('link').textContent),
+    title: item.querySelector('title').textContent,
+    description: item.querySelector('description').textContent,
+    link: item.querySelector('link').textContent,
     feedId: id,
     isVisited: false,
   };
@@ -61,7 +49,7 @@ export default () => {
     message: document.querySelector('.feedback'),
     postsCard: document.querySelector('.posts'),
     feedsCard: document.querySelector('.feeds'),
-    modal: document.querySelector('.modal'),
+    modal: new Modal(document.getElementById('modal')),
     modalTitle: document.querySelector('.modal-title'),
     modalText: document.querySelector('.modal-body'),
     buttonCross: document.querySelector('.btn-close'),
@@ -69,25 +57,31 @@ export default () => {
     buttonLink: document.querySelector('.full-article'),
     body: document.querySelector('body'),
   };
-  const delay = 5000;
+
+  i18next.init({
+    lng: 'ru',
+    debug: false,
+    resources: {
+      ru,
+    },
+  });
+
   const stateRSS = {
     processState: 'filling',
     field: '',
     feeds: [],
     posts: [],
     listUrl: [],
-    visitedLinks: [],
+    visitedLinks: new Set(),
   };
 
   const watchedState = onChange(stateRSS, () => {
-    renderInput(watchedState, elements);
-    renderMessageFeedback(watchedState, elements);
-    renderFeeds(watchedState, elements);
-    renderPosts(watchedState, elements);
+    render(watchedState, elements, i18next);
   });
 
   elements.input.addEventListener('input', (e) => {
     watchedState.field = e.target.value;
+
     if (watchedState.field === '') {
       watchedState.processState = 'filling';
     }
@@ -96,32 +90,35 @@ export default () => {
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     watchedState.processState = 'processing';
-    i18.then(() => {
-      elements.message.textContent = i18next.t('isLoading');
-    });
 
+    yup.setLocale({
+      mixed: {
+        notOneOf: () => ({ key: 'exist' }),
+      },
+      string: {
+        url: () => ({ key: 'notUrl' }),
+        required: () => ({ key: 'notEmpty' }),
+      },
+    });
     const schema = yup.string().url().required().notOneOf(watchedState.listUrl);
     schema
       .validate(watchedState.field)
       .then(() => {
         axios.get(buildPath(watchedState.field))
           .then((res) => {
-            const doc = markup(res.data.contents);
-            const errorNode = doc.querySelector('parsererror');
-            if (errorNode) {
+            let doc;
+            try {
+              doc = parse(res.data.contents);
+            } catch {
               watchedState.processState = 'failed';
-              i18.then(() => {
-                elements.message.textContent = i18next.t('notValidRSS');
-              });
+
               return;
             }
-            watchedState.processState = 'processed';
-            const validRss = watchedState.field;
-            i18.then(() => {
-              elements.message.textContent = i18next.t('success');
-            });
 
-            watchedState.feeds.push(createFeed(doc, validRss));
+            watchedState.processState = 'processed';
+            const validUrlRss = watchedState.field;
+
+            watchedState.feeds.push(createFeed(doc, validUrlRss));
 
             const posts = doc.querySelectorAll('item');
             posts.forEach((item) => {
@@ -129,14 +126,11 @@ export default () => {
               watchedState.posts.unshift(createPost(item, feedId));
             });
 
-            watchedState.listUrl.push(validRss);
+            watchedState.listUrl.push(validUrlRss);
             form.reset();
           })
           .catch(() => {
-            i18.then(() => {
-              watchedState.processState = 'offline';
-              elements.message.textContent = i18next.t('networkError');
-            });
+            watchedState.processState = 'offline';
           });
       })
       .catch((err) => {
@@ -154,32 +148,28 @@ export default () => {
       .then((responses) => {
         responses.forEach(({ result, value, id }) => {
           if (result === 'success') {
-            watchedState.processState = 'filling';
+            watchedState.processState = 'processed';
             const filteredPostsFeed = watchedState.posts.filter((post) => post.feedId === id);
             const links = filteredPostsFeed.map((i) => i.link);
 
-            const newDoc = markup(value.data.contents);
+            const newDoc = parse(value.data.contents);
             const newPosts = newDoc.querySelectorAll('item');
             Array.from(newPosts)
               .reverse()
               .forEach((item) => {
-                const linkNewPost = unifyText(item.querySelector('link').textContent);
+                const linkNewPost = item.querySelector('link').textContent;
                 if (!links.includes(linkNewPost)) {
                   watchedState.posts.push(createPost(item, id));
                 }
               });
           } else {
-            i18.then(() => {
-              watchedState.processState = 'offline';
-              elements.message.textContent = i18next.t('networkError');
-            });
+            watchedState.processState = 'offline';
           }
         });
-        setTimeout(updatePosts, delay);
+        setTimeout(updatePosts, 5000);
       });
   }
 
-  renderInput(watchedState, elements);
-  renderMessageFeedback(watchedState, elements);
+  render(watchedState, elements, i18next);
   updatePosts();
 };
