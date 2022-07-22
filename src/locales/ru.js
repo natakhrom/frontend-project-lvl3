@@ -1,5 +1,8 @@
 const ru = {
   translation: {
+    posts: 'Посты',
+    feeds: 'Фиды',
+    buttonText: 'Просмотр',
     isLoading: 'Идёт загрузка...',
     success: 'RSS успешно загружен',
     notUrl: 'Ссылка должна быть валидным URL',

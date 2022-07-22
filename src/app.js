@@ -1,9 +1,10 @@
 /* eslint-disable no-undef */
+/* eslint-disable no-param-reassign */
 import * as yup from 'yup';
 import { Modal } from 'bootstrap';
 import onChange from 'on-change';
 import i18next from 'i18next';
-import uniqueId from 'lodash/uniqueId';
+import _ from 'lodash';
 import axios from 'axios';
 import render from './view.js';
 import parse from './parse.js';
@@ -19,7 +20,7 @@ const buildPath = (url) => {
 
 const createFeed = (dom, urlRss) => {
   const feed = {
-    id: uniqueId(),
+    id: _.uniqueId(),
     title: dom.querySelector('channel').querySelector('title').textContent,
     description: dom.querySelector('description').textContent,
     url: urlRss,
@@ -30,7 +31,7 @@ const createFeed = (dom, urlRss) => {
 
 const createPost = (item, id) => {
   const post = {
-    id: uniqueId(),
+    id: _.uniqueId(),
     title: item.querySelector('title').textContent,
     description: item.querySelector('description').textContent,
     link: item.querySelector('link').textContent,
@@ -39,6 +40,38 @@ const createPost = (item, id) => {
   };
 
   return post;
+};
+
+const updatePosts = (state) => {
+  console.log('updatePosts called.');
+  const feedPromises = state.feeds.map(({ url, id }) => axios.get(buildPath(url))
+    .then((v) => ({ result: 'success', value: v, id }))
+    .catch((e) => ({ result: 'error', value: e })));
+
+  Promise.all(feedPromises)
+    .then((responses) => {
+      state.processState = 'processed';
+      responses.forEach((response) => {
+        if (response.result === 'success') {
+          const links = state.posts.map((i) => i.link);
+
+          const newDoc = parse(response.value.data.contents);
+          const newPosts = newDoc.querySelectorAll('item');
+          Array.from(newPosts)
+            .reverse()
+            .forEach((item) => {
+              const linkNewPost = item.querySelector('link').textContent;
+              if (!links.includes(linkNewPost)) {
+                state.posts.push(createPost(item, response.id));
+              }
+            });
+        } else {
+          state.processState = 'offline';
+        }
+      });
+    })
+    .catch((e) => console.log(e))
+    .finally(() => setTimeout(() => updatePosts(state), 5000));
 };
 
 export default () => {
@@ -68,28 +101,23 @@ export default () => {
 
   const stateRSS = {
     processState: 'filling',
-    field: '',
     feeds: [],
     posts: [],
-    listUrl: [],
+    listRss: [],
     visitedLinks: new Set(),
+    autoUpdateStarted: false,
   };
 
   const watchedState = onChange(stateRSS, () => {
     render(watchedState, elements, i18next);
   });
 
-  elements.input.addEventListener('input', (e) => {
-    watchedState.field = e.target.value;
-
-    if (watchedState.field === '') {
-      watchedState.processState = 'filling';
-    }
-  });
-
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     watchedState.processState = 'processing';
+
+    const formData = new FormData(e.target);
+    const urlRss = formData.get('url');
 
     yup.setLocale({
       mixed: {
@@ -100,11 +128,11 @@ export default () => {
         required: () => ({ key: 'notEmpty' }),
       },
     });
-    const schema = yup.string().url().required().notOneOf(watchedState.listUrl);
+    const schema = yup.string().url().required().notOneOf(watchedState.listRss);
     schema
-      .validate(watchedState.field)
+      .validate(urlRss)
       .then(() => {
-        axios.get(buildPath(watchedState.field))
+        axios.get(buildPath(urlRss))
           .then((res) => {
             let doc;
             try {
@@ -116,18 +144,21 @@ export default () => {
             }
 
             watchedState.processState = 'processed';
-            const validUrlRss = watchedState.field;
-
-            watchedState.feeds.push(createFeed(doc, validUrlRss));
+            watchedState.feeds.push(createFeed(doc, urlRss));
 
             const posts = doc.querySelectorAll('item');
+            const feedId = watchedState.feeds[watchedState.feeds.length - 1].id;
             posts.forEach((item) => {
-              const feedId = watchedState.feeds[watchedState.feeds.length - 1].id;
               watchedState.posts.unshift(createPost(item, feedId));
             });
 
-            watchedState.listUrl.push(validUrlRss);
+            watchedState.listRss.push(urlRss);
             form.reset();
+
+            if (!watchedState.autoUpdateStarted) {
+              watchedState.autoUpdateStarted = true;
+              setTimeout(() => updatePosts(watchedState), 5000);
+            }
           })
           .catch(() => {
             watchedState.processState = 'offline';
@@ -139,36 +170,5 @@ export default () => {
       });
   });
 
-  function updatePosts() {
-    const feedPromises = watchedState.feeds.map(({ url, id }) => axios.get(buildPath(url))
-      .then((v) => ({ result: 'success', value: v, id }))
-      .catch((e) => ({ result: 'error', value: e })));
-
-    Promise.all(feedPromises)
-      .then((responses) => {
-        responses.forEach(({ result, value, id }) => {
-          if (result === 'success') {
-            const filteredPostsFeed = watchedState.posts.filter((post) => post.feedId === id);
-            const links = filteredPostsFeed.map((i) => i.link);
-
-            const newDoc = parse(value.data.contents);
-            const newPosts = newDoc.querySelectorAll('item');
-            Array.from(newPosts)
-              .reverse()
-              .forEach((item) => {
-                const linkNewPost = item.querySelector('link').textContent;
-                if (!links.includes(linkNewPost)) {
-                  watchedState.posts.push(createPost(item, id));
-                }
-              });
-          } else {
-            watchedState.processState = 'offline';
-          }
-        });
-        setTimeout(updatePosts, 5000);
-      });
-  }
-
   render(watchedState, elements, i18next);
-  updatePosts();
 };

@@ -26,7 +26,7 @@ const createUlContainer = () => {
   return ul;
 };
 
-const renderPosts = (state, elements) => {
+const renderPosts = (state, elements, i18next) => {
   if (state.posts.length !== 0) {
     elements.postsCard.innerHTML = '';
     const ul = createUlContainer();
@@ -58,7 +58,7 @@ const renderPosts = (state, elements) => {
       a.addEventListener('click', () => {
         post.isVisited = true;
         state.visitedLinks.add(post.id);
-        renderPosts(state, elements);
+        renderPosts(state, elements, i18next);
       });
 
       const button = document.createElement('button');
@@ -67,12 +67,12 @@ const renderPosts = (state, elements) => {
       button.setAttribute('data-bs-target', '#modal');
       button.setAttribute('data-id', post.id);
       button.classList.add('btn', 'btn-outline-primary', 'btn-sm');
-      button.textContent = 'Просмотр';
+      button.textContent = i18next.t('buttonText');
 
       button.addEventListener('click', () => {
         post.isVisited = true;
         state.visitedLinks.add(post.id);
-        renderPosts(state, elements);
+        renderPosts(state, elements, i18next);
 
         elements.modal.toggle();
         elements.modalTitle.textContent = post.title;
@@ -86,11 +86,11 @@ const renderPosts = (state, elements) => {
       ul.prepend(li);
     });
 
-    elements.postsCard.append(createTitle('Посты'), ul);
+    elements.postsCard.append(createTitle(i18next.t('posts')), ul);
   }
 };
 
-const renderFeeds = (state, elements) => {
+const renderFeeds = (state, elements, i18next) => {
   if (state.feeds.length !== 0) {
     elements.feedsCard.innerHTML = '';
     const ul = createUlContainer();
@@ -111,7 +111,7 @@ const renderFeeds = (state, elements) => {
       ul.append(li);
     });
 
-    elements.feedsCard.append(createTitle('Фиды'), ul);
+    elements.feedsCard.append(createTitle(i18next.t('feeds')), ul);
   }
 };
 
@@ -140,8 +140,8 @@ const render = (state, elements, i18next) => {
       elements.message.classList.remove('text-danger', 'text-info');
       elements.message.classList.add('text-success');
       elements.message.textContent = i18next.t('success');
-      renderFeeds(state, elements);
-      renderPosts(state, elements);
+      renderFeeds(state, elements, i18next);
+      renderPosts(state, elements, i18next);
       break;
 
     case 'offline':
