@@ -43,7 +43,6 @@ const createPost = (item, id) => {
 };
 
 const updatePosts = (state) => {
-  console.log('updatePosts called.');
   const feedPromises = state.feeds.map(({ url, id }) => axios.get(buildPath(url))
     .then((v) => ({ result: 'success', value: v, id }))
     .catch((e) => ({ result: 'error', value: e })));
