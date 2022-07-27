@@ -1,5 +1,6 @@
 /* eslint-disable no-undef */
 /* eslint-disable no-param-reassign */
+import onChange from 'on-change';
 
 const createTitle = (title) => {
   const div = document.createElement('div');
@@ -116,7 +117,7 @@ const renderFeeds = (state, elements, i18next) => {
 };
 
 const render = (state, elements, i18next) => {
-  switch (state.processState) {
+  switch (state.processState.status) {
     case 'filling':
       elements.input.classList.remove('is-invalid');
       elements.message.classList.remove('text-danger', 'text-info');
@@ -155,7 +156,16 @@ const render = (state, elements, i18next) => {
       elements.input.removeAttribute('readonly');
       elements.message.classList.remove('text-success', 'text-info');
       elements.message.classList.add('text-danger');
-      elements.message.textContent = i18next.t('notValidRSS');
+      elements.message.textContent = state.processState.failedError !== null
+        ? state.processState.failedError.errors.map((error) => i18next.t(error.key))
+        : i18next.t('notValidRSS');
+      break;
+
+    case 'update':
+      renderPosts(state, elements, i18next);
+      elements.message.textContent = elements.message.textContent === i18next.t('networkError')
+        ? elements.message.textContent = ''
+        : elements.message.textContent;
       break;
 
     default:
@@ -163,4 +173,12 @@ const render = (state, elements, i18next) => {
   }
 };
 
-export default render;
+const watch = (state, elements, i18next) => {
+  const watchedState = onChange(state, () => {
+    render(state, elements, i18next);
+  });
+
+  return watchedState;
+};
+
+export default watch;

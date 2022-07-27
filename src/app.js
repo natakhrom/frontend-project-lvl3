@@ -2,11 +2,10 @@
 /* eslint-disable no-param-reassign */
 import * as yup from 'yup';
 import { Modal } from 'bootstrap';
-import onChange from 'on-change';
 import i18next from 'i18next';
 import _ from 'lodash';
 import axios from 'axios';
-import render from './view.js';
+import watch from './view.js';
 import parse from './parse.js';
 import ru from './locales/ru.js';
 
@@ -18,23 +17,23 @@ const buildPath = (url) => {
   return parsedUrl.toString();
 };
 
-const createFeed = (dom, urlRss) => {
+const createFeed = (title, description, urlRss) => {
   const feed = {
     id: _.uniqueId(),
-    title: dom.querySelector('channel').querySelector('title').textContent,
-    description: dom.querySelector('description').textContent,
+    title,
+    description,
     url: urlRss,
   };
 
   return feed;
 };
 
-const createPost = (item, id) => {
+const createPost = (title, description, link, id) => {
   const post = {
     id: _.uniqueId(),
-    title: item.querySelector('title').textContent,
-    description: item.querySelector('description').textContent,
-    link: item.querySelector('link').textContent,
+    title,
+    description,
+    link,
     feedId: id,
     isVisited: false,
   };
@@ -49,23 +48,22 @@ const updatePosts = (state) => {
 
   Promise.all(feedPromises)
     .then((responses) => {
-      state.processState = 'processed';
       responses.forEach((response) => {
         if (response.result === 'success') {
+          state.processState = { failedError: null, status: 'update' };
           const links = state.posts.map((i) => i.link);
 
           const newDoc = parse(response.value.data.contents);
-          const newPosts = newDoc.querySelectorAll('item');
-          Array.from(newPosts)
+          const { posts } = newDoc;
+          posts
             .reverse()
-            .forEach((item) => {
-              const linkNewPost = item.querySelector('link').textContent;
-              if (!links.includes(linkNewPost)) {
-                state.posts.push(createPost(item, response.id));
+            .forEach(([title, description, link]) => {
+              if (!links.includes(link)) {
+                state.posts.push(createPost(title, description, link, response.id));
               }
             });
         } else {
-          state.processState = 'offline';
+          state.processState = { failedError: null, status: 'offline' };
         }
       });
     })
@@ -98,8 +96,11 @@ export default () => {
     },
   });
 
-  const stateRSS = {
-    processState: 'filling',
+  const initialState = {
+    processState: {
+      status: 'filling',
+      failedError: null,
+    },
     feeds: [],
     posts: [],
     listRss: [],
@@ -107,13 +108,17 @@ export default () => {
     autoUpdateStarted: false,
   };
 
-  const watchedState = onChange(stateRSS, () => {
-    render(watchedState, elements, i18next);
+  const watchedState = watch(initialState, elements, i18next);
+
+  elements.input.addEventListener('input', () => {
+    if (elements.input.value === '') {
+      watchedState.processState.status = 'filling';
+    }
   });
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    watchedState.processState = 'processing';
+    watchedState.processState = { failedError: null, status: 'processing' };
 
     const formData = new FormData(e.target);
     const urlRss = formData.get('url');
@@ -127,28 +132,22 @@ export default () => {
         required: () => ({ key: 'notEmpty' }),
       },
     });
+
     const schema = yup.string().url().required().notOneOf(watchedState.listRss);
     schema
       .validate(urlRss)
       .then(() => {
         axios.get(buildPath(urlRss))
           .then((res) => {
-            let doc;
-            try {
-              doc = parse(res.data.contents);
-            } catch {
-              watchedState.processState = 'failed';
+            watchedState.processState = { failedError: null, status: 'processed' };
+            const doc = parse(res.data.contents);
+            const { title, description, posts } = doc;
 
-              return;
-            }
+            watchedState.feeds.push(createFeed(title, description, urlRss));
 
-            watchedState.processState = 'processed';
-            watchedState.feeds.push(createFeed(doc, urlRss));
-
-            const posts = doc.querySelectorAll('item');
             const feedId = watchedState.feeds[watchedState.feeds.length - 1].id;
-            posts.forEach((item) => {
-              watchedState.posts.unshift(createPost(item, feedId));
+            posts.forEach(([titlePost, descriptionPost, linkPost]) => {
+              watchedState.posts.unshift(createPost(titlePost, descriptionPost, linkPost, feedId));
             });
 
             watchedState.listRss.push(urlRss);
@@ -159,15 +158,16 @@ export default () => {
               setTimeout(() => updatePosts(watchedState), 5000);
             }
           })
-          .catch(() => {
-            watchedState.processState = 'offline';
+          .catch((err) => {
+            if (err.message === 'ParseError') {
+              watchedState.processState = { failedError: null, status: 'failed' };
+            } else {
+              watchedState.processState = { failedError: null, status: 'offline' };
+            }
           });
       })
       .catch((err) => {
-        watchedState.processState = 'failed';
-        elements.message.textContent = err.errors.map((error) => i18next.t(error.key));
+        watchedState.processState = { failedError: err, status: 'failed' };
       });
   });
-
-  render(watchedState, elements, i18next);
 };
