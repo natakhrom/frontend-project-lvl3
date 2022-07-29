@@ -1,6 +1,7 @@
 /* eslint-disable no-undef */
 /* eslint-disable no-param-reassign */
 import onChange from 'on-change';
+// import MyError from './MyError.js';
 
 const createTitle = (title) => {
   const div = document.createElement('div');
@@ -29,7 +30,7 @@ const createUlContainer = () => {
 
 const renderPosts = (state, elements, i18next) => {
   if (state.posts.length !== 0) {
-    elements.postsCard.innerHTML = '';
+    elements.postsContainer.innerHTML = '';
     const ul = createUlContainer();
 
     state.posts.forEach((post) => {
@@ -56,12 +57,6 @@ const renderPosts = (state, elements, i18next) => {
         a.classList.add('fw-bold');
       }
 
-      a.addEventListener('click', () => {
-        post.isVisited = true;
-        state.visitedLinks.add(post.id);
-        renderPosts(state, elements, i18next);
-      });
-
       const button = document.createElement('button');
       button.setAttribute('type', 'button');
       button.setAttribute('data-bs-toggle', 'modal');
@@ -70,30 +65,17 @@ const renderPosts = (state, elements, i18next) => {
       button.classList.add('btn', 'btn-outline-primary', 'btn-sm');
       button.textContent = i18next.t('buttonText');
 
-      button.addEventListener('click', () => {
-        post.isVisited = true;
-        state.visitedLinks.add(post.id);
-        renderPosts(state, elements, i18next);
-
-        elements.modal.toggle();
-        elements.modalTitle.textContent = post.title;
-        elements.modalText.textContent = post.description;
-        elements.buttonLink.addEventListener('click', () => {
-          elements.buttonLink.setAttribute('href', post.link);
-        });
-      });
-
       li.append(a, button);
       ul.prepend(li);
     });
 
-    elements.postsCard.append(createTitle(i18next.t('posts')), ul);
+    elements.postsContainer.append(createTitle(i18next.t('posts')), ul);
   }
 };
 
 const renderFeeds = (state, elements, i18next) => {
   if (state.feeds.length !== 0) {
-    elements.feedsCard.innerHTML = '';
+    elements.feedsContainer.innerHTML = '';
     const ul = createUlContainer();
 
     state.feeds.forEach(({ title, description }) => {
@@ -112,12 +94,18 @@ const renderFeeds = (state, elements, i18next) => {
       ul.append(li);
     });
 
-    elements.feedsCard.append(createTitle(i18next.t('feeds')), ul);
+    elements.feedsContainer.append(createTitle(i18next.t('feeds')), ul);
   }
 };
 
+const createErrorMessage = (state, i18next) => {
+  const [error] = state.errors;
+
+  return i18next.t(error.key);
+};
+
 const render = (state, elements, i18next) => {
-  switch (state.processState.status) {
+  switch (state.processState) {
     case 'filling':
       elements.input.classList.remove('is-invalid');
       elements.message.classList.remove('text-danger', 'text-info');
@@ -156,9 +144,7 @@ const render = (state, elements, i18next) => {
       elements.input.removeAttribute('readonly');
       elements.message.classList.remove('text-success', 'text-info');
       elements.message.classList.add('text-danger');
-      elements.message.textContent = state.processState.failedError !== null
-        ? state.processState.failedError.errors.map((error) => i18next.t(error.key))
-        : i18next.t('notValidRSS');
+      elements.message.textContent = createErrorMessage(state, i18next);
       break;
 
     case 'update':
@@ -173,6 +159,13 @@ const render = (state, elements, i18next) => {
   }
 };
 
+const showModal = (elements, post) => {
+  elements.modal.show();
+  elements.modalTitle.textContent = post.title;
+  elements.modalText.textContent = post.description;
+  elements.buttonLink.setAttribute('href', post.link);
+};
+
 const watch = (state, elements, i18next) => {
   const watchedState = onChange(state, () => {
     render(state, elements, i18next);
@@ -181,4 +174,4 @@ const watch = (state, elements, i18next) => {
   return watchedState;
 };
 
-export default watch;
+export { watch, showModal };

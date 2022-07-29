@@ -5,9 +5,10 @@ import { Modal } from 'bootstrap';
 import i18next from 'i18next';
 import _ from 'lodash';
 import axios from 'axios';
-import watch from './view.js';
+import { watch, showModal } from './view.js';
 import parse from './parse.js';
 import ru from './locales/ru.js';
+import MyError from './MyError.js';
 
 const buildPath = (url) => {
   const parsedUrl = new URL('/get', 'https://allorigins.hexlet.app');
@@ -35,7 +36,6 @@ const createPost = (title, description, link, id) => {
     description,
     link,
     feedId: id,
-    isVisited: false,
   };
 
   return post;
@@ -50,7 +50,7 @@ const updatePosts = (state) => {
     .then((responses) => {
       responses.forEach((response) => {
         if (response.result === 'success') {
-          state.processState = { failedError: null, status: 'update' };
+          state.processState = 'update';
           const links = state.posts.map((i) => i.link);
 
           const newDoc = parse(response.value.data.contents);
@@ -63,7 +63,7 @@ const updatePosts = (state) => {
               }
             });
         } else {
-          state.processState = { failedError: null, status: 'offline' };
+          state.processState = 'offline';
         }
       });
     })
@@ -77,15 +77,12 @@ export default () => {
     input: form.elements.url,
     button: form.querySelector('button'),
     message: document.querySelector('.feedback'),
-    postsCard: document.querySelector('.posts'),
-    feedsCard: document.querySelector('.feeds'),
+    postsContainer: document.querySelector('.posts'),
+    feedsContainer: document.querySelector('.feeds'),
     modal: new Modal(document.getElementById('modal')),
     modalTitle: document.querySelector('.modal-title'),
     modalText: document.querySelector('.modal-body'),
-    buttonCross: document.querySelector('.btn-close'),
-    buttonClose: document.querySelector('.btn-secondary'),
     buttonLink: document.querySelector('.full-article'),
-    body: document.querySelector('body'),
   };
 
   i18next.init({
@@ -97,28 +94,40 @@ export default () => {
   });
 
   const initialState = {
-    processState: {
-      status: 'filling',
-      failedError: null,
-    },
+    processState: 'filling',
     feeds: [],
     posts: [],
     listRss: [],
     visitedLinks: new Set(),
+    errors: [],
     autoUpdateStarted: false,
   };
 
   const watchedState = watch(initialState, elements, i18next);
+  console.log(watchedState.errors);
 
   elements.input.addEventListener('input', () => {
     if (elements.input.value === '') {
-      watchedState.processState.status = 'filling';
+      watchedState.processState = 'filling';
+    }
+  });
+
+  elements.postsContainer.addEventListener('click', (e) => {
+    const elem = e.target;
+    const { id } = elem.dataset;
+    const currentPost = watchedState.posts.find((p) => p.id === id);
+
+    if (elem.tagName === 'BUTTON') {
+      showModal(elements, currentPost);
+      watchedState.visitedLinks.add(id);
+    } else if (elem.tagName === 'A') {
+      watchedState.visitedLinks.add(id);
     }
   });
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
-    watchedState.processState = { failedError: null, status: 'processing' };
+    watchedState.processState = 'processing';
 
     const formData = new FormData(e.target);
     const urlRss = formData.get('url');
@@ -139,7 +148,7 @@ export default () => {
       .then(() => {
         axios.get(buildPath(urlRss))
           .then((res) => {
-            watchedState.processState = { failedError: null, status: 'processed' };
+            watchedState.processState = 'processed';
             const doc = parse(res.data.contents);
             const { title, description, posts } = doc;
 
@@ -159,15 +168,17 @@ export default () => {
             }
           })
           .catch((err) => {
-            if (err.message === 'ParseError') {
-              watchedState.processState = { failedError: null, status: 'failed' };
+            watchedState.errors = err.errors;
+            if (err instanceof MyError) {
+              watchedState.processState = 'failed';
             } else {
-              watchedState.processState = { failedError: null, status: 'offline' };
+              watchedState.processState = 'offline';
             }
           });
       })
       .catch((err) => {
-        watchedState.processState = { failedError: err, status: 'failed' };
+        watchedState.errors = err.errors;
+        watchedState.processState = 'failed';
       });
   });
 };

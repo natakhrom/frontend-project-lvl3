@@ -1,11 +1,13 @@
 /* eslint-disable no-undef */
+import MyError from './MyError.js';
+
 const parse = (string) => {
   const parser = new DOMParser();
   const content = parser.parseFromString(string, 'application/xml');
   const errorNode = content.querySelector('parsererror');
 
   if (errorNode) {
-    throw new Error('ParseError');
+    throw new MyError('Не валидный RSS');
   }
 
   return {
