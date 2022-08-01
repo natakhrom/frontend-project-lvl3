@@ -1,5 +1,5 @@
 /* eslint-disable no-undef */
-import MyError from './MyError.js';
+import RssError from './RssError.js';
 
 const parse = (string) => {
   const parser = new DOMParser();
@@ -7,7 +7,7 @@ const parse = (string) => {
   const errorNode = content.querySelector('parsererror');
 
   if (errorNode) {
-    throw new MyError('Не валидный RSS');
+    throw new RssError('Не валидный RSS');
   }
 
   return {

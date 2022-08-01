@@ -1,9 +1,9 @@
-class MyError extends Error {
+class RssError extends Error {
   constructor(message) {
     super(message);
-    this.name = 'MyError';
+    this.name = 'RssError';
     this.errors = [{ key: 'notValidRSS' }];
   }
 }
 
-export default MyError;
+export default RssError;

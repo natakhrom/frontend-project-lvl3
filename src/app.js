@@ -8,7 +8,7 @@ import axios from 'axios';
 import { watch, showModal } from './view.js';
 import parse from './parse.js';
 import ru from './locales/ru.js';
-import MyError from './MyError.js';
+import RssError from './RssError.js';
 
 const buildPath = (url) => {
   const parsedUrl = new URL('/get', 'https://allorigins.hexlet.app');
@@ -169,7 +169,7 @@ export default () => {
           })
           .catch((err) => {
             watchedState.errors = err.errors;
-            if (err instanceof MyError) {
+            if (err instanceof RssError) {
               watchedState.processState = 'failed';
             } else {
               watchedState.processState = 'offline';

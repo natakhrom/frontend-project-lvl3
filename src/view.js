@@ -134,6 +134,8 @@ const render = (state, elements, i18next) => {
       break;
 
     case 'offline':
+      elements.button.removeAttribute('disabled');
+      elements.input.removeAttribute('readonly');
       elements.message.classList.add('text-danger');
       elements.message.textContent = i18next.t('networkError');
       break;
