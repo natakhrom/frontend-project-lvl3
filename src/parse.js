@@ -7,7 +7,7 @@ const parse = (string) => {
   const errorNode = content.querySelector('parsererror');
 
   if (errorNode) {
-    throw new RssError('Не валидный RSS');
+    throw new RssError();
   }
 
   return {

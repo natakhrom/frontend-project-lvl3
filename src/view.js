@@ -1,7 +1,6 @@
 /* eslint-disable no-undef */
 /* eslint-disable no-param-reassign */
 import onChange from 'on-change';
-// import MyError from './MyError.js';
 
 const createTitle = (title) => {
   const div = document.createElement('div');
@@ -129,6 +128,7 @@ const render = (state, elements, i18next) => {
       elements.message.classList.remove('text-danger', 'text-info');
       elements.message.classList.add('text-success');
       elements.message.textContent = i18next.t('success');
+      elements.form.reset();
       renderFeeds(state, elements, i18next);
       renderPosts(state, elements, i18next);
       break;

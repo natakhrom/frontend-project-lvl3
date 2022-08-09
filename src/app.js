@@ -72,10 +72,10 @@ const updatePosts = (state) => {
 };
 
 export default () => {
-  const form = document.querySelector('form');
   const elements = {
-    input: form.elements.url,
-    button: form.querySelector('button'),
+    form: document.querySelector('form'),
+    input: document.querySelector('form').elements.url,
+    button: document.querySelector('form').querySelector('button'),
     message: document.querySelector('.feedback'),
     postsContainer: document.querySelector('.posts'),
     feedsContainer: document.querySelector('.feeds'),
@@ -100,11 +100,9 @@ export default () => {
     listRss: [],
     visitedLinks: new Set(),
     errors: [],
-    autoUpdateStarted: false,
   };
 
   const watchedState = watch(initialState, elements, i18next);
-  console.log(watchedState.errors);
 
   elements.input.addEventListener('input', () => {
     if (elements.input.value === '') {
@@ -125,7 +123,7 @@ export default () => {
     }
   });
 
-  form.addEventListener('submit', (e) => {
+  elements.form.addEventListener('submit', (e) => {
     e.preventDefault();
     watchedState.processState = 'processing';
 
@@ -150,8 +148,8 @@ export default () => {
           .then((res) => {
             watchedState.processState = 'processed';
             const doc = parse(res.data.contents);
-            const { title, description, posts } = doc;
 
+            const { title, description, posts } = doc;
             watchedState.feeds.push(createFeed(title, description, urlRss));
 
             const feedId = watchedState.feeds[watchedState.feeds.length - 1].id;
@@ -160,12 +158,7 @@ export default () => {
             });
 
             watchedState.listRss.push(urlRss);
-            form.reset();
-
-            if (!watchedState.autoUpdateStarted) {
-              watchedState.autoUpdateStarted = true;
-              setTimeout(() => updatePosts(watchedState), 5000);
-            }
+            setTimeout(() => updatePosts(watchedState), 5000);
           })
           .catch((err) => {
             watchedState.errors = err.errors;
